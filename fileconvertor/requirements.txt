@@ -1,0 +1,21 @@
+fastapi
+uvicorn
+python-multipart
+aiofiles
+PyPDF2
+python-docx
+fpdf2
+pillow
+speechrecognition
+openpyxl
+pandas
+ffmpeg-python
+pytesseract
+pyaudio
+reportlab
+docx2pdf
+PyMuPDF
+pyttsx3
+
+# Font desteği için
+fonttools  # TTF font dosyalarının okunabilirliğini artırır
