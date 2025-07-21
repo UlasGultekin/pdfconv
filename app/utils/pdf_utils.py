@@ -1,30 +1,31 @@
 import os
 import tempfile
 import fitz  # PyMuPDF
-from PyPDF2 import PdfReader
 from docx import Document
 from fpdf import FPDF
 
+OUTPUT_DIR = "outputs"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Çok dilli destekli TTF font yolu (backend/fonts altında)
-FONT_PATH = os.path.join(os.path.dirname(__file__), "..", "fonts", "NotoSans-Regular.ttf")
+# Çok dilli destekli TTF font yolu
+FONT_PATH = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'DejaVuSans.ttf')
+FONT_NAME = "DejaVuSans"
 
 
 def convert_pdf_to_text(content: bytes, filename: str) -> str:
-    """PDF → TXT (Unicode destekli)"""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-
-    reader = PdfReader(tmp_path)
+    """PDF → TXT (PyMuPDF ile, Unicode destekli)"""
     text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-
-    os.remove(tmp_path)
+    try:
+        doc = fitz.open(stream=content, filetype="pdf")
+        for page in doc:
+            text += page.get_text()
+    except Exception as e:
+        # Hata durumunda boş metin veya bir hata mesajı döndür
+        print(f"PDF metin çıkarma hatası: {e}")
+        text = ""
 
     base_name = os.path.splitext(filename)[0]
-    output_path = f"{base_name}.txt"
+    output_path = os.path.join(OUTPUT_DIR, f"{base_name}.txt")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(text)
 
@@ -33,15 +34,21 @@ def convert_pdf_to_text(content: bytes, filename: str) -> str:
 
 def convert_pdf_to_word(pdf_bytes: bytes, filename: str) -> str:
     """PDF → DOCX (Unicode destekli)"""
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     word_doc = Document()
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        for page in doc:
+            text = page.get_text("text", flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE)
+            if text.strip():
+                word_doc.add_paragraph(text)
+    except Exception as e:
+        print(f"PDF'ten Word'e dönüştürme hatası: {e}")
+        # Hata durumunda en azından bir mesaj ekle
+        word_doc.add_paragraph(f"[Dönüştürme hatası: {e}]")
 
-    for page in doc:
-        text = page.get_text()
-        if text.strip():
-            word_doc.add_paragraph(text.strip())
 
-    output_path = f"{filename.rsplit('.', 1)[0]}.docx"
+    base_name = os.path.splitext(filename)[0]
+    output_path = os.path.join(OUTPUT_DIR, f"{base_name}.docx")
     word_doc.save(output_path)
     return output_path
 
@@ -49,18 +56,17 @@ def convert_pdf_to_word(pdf_bytes: bytes, filename: str) -> str:
 def convert_text_to_pdf(content: bytes, filename: str) -> str:
     """TXT → PDF (Unicode destekli - TTF fontlu)"""
     text = content.decode("utf-8")
-    base_name = filename.rsplit('.', 1)[0]
-    output_path = f"{base_name}.pdf"
+    base_name = os.path.splitext(filename)[0]
+    output_path = os.path.join(OUTPUT_DIR, f"{base_name}.pdf")
 
     pdf = FPDF()
     pdf.add_page()
 
-    # 🎯 NotoSans fontunu ekle
-    pdf.add_font("NotoSans", "", FONT_PATH, uni=True)
-    pdf.set_font("NotoSans", size=12)
+    # DejaVuSans fontunu ekle
+    pdf.add_font(FONT_NAME, "", FONT_PATH, uni=True)
+    pdf.set_font(FONT_NAME, size=12)
 
-    for line in text.splitlines():
-        pdf.multi_cell(0, 10, txt=line)
+    pdf.write(8, text)
 
     pdf.output(output_path)
     return output_path

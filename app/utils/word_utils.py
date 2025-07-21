@@ -4,6 +4,8 @@ import tempfile
 import shutil
 import platform
 
+OUTPUT_DIR = "outputs"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def convert_word_to_pdf(content: bytes, filename: str) -> str:
     """
@@ -33,9 +35,7 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
         pdf_path = os.path.join(tmp_dir, pdf_name)
 
         # Hedef klasöre taşı
-        output_folder = os.path.abspath("outputs")
-        os.makedirs(output_folder, exist_ok=True)
-        final_output_path = os.path.join(output_folder, pdf_name)
-        shutil.copy(pdf_path, final_output_path)
+        final_output_path = os.path.join(OUTPUT_DIR, pdf_name)
+        shutil.move(pdf_path, final_output_path)
 
         return final_output_path
