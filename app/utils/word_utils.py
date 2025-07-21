@@ -9,6 +9,10 @@ from fpdf import FPDF
 OUTPUT_DIR = "outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# Çok dilli destekli TTF font yolu
+FONT_PATH = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'DejaVuSans.ttf')
+FONT_NAME = "DejaVuSans"
+
 def convert_word_to_pdf(content: bytes, filename: str) -> str:
     """
     DOCX dosyasını PDF'e dönüştürür.
@@ -61,20 +65,28 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
             pass
 
     # 3. Sadece metin tabanlı PDF (her ortamda çalışır)
-    # Kullanıcıya uyarı mesajı bırakmak için çıktı dosyasının adını özel yapıyoruz
     base_name = os.path.splitext(filename)[0]
     output_path = os.path.join(OUTPUT_DIR, f"{base_name}_textonly.pdf")
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
         tmp.write(content)
         tmp_path = tmp.name
+    
     doc = Document(tmp_path)
     os.remove(tmp_path)
+    
     pdf = FPDF()
     pdf.add_page()
+    pdf.add_font(FONT_NAME, "", FONT_PATH, uni=True)
+    pdf.set_font(FONT_NAME, size=12)
     pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Arial", size=12)
+    
+    # Uyarıyı PDF'e ekle
     pdf.multi_cell(0, 10, "UYARI: Sunucuda ofis yazılımı bulunamadığı için sadece metin dönüştürüldü. Biçimlendirme ve görseller kaybolmuş olabilir.\n\n")
+    
+    # Metni PDF'e ekle
     for para in doc.paragraphs:
         pdf.multi_cell(0, 10, para.text)
+        
     pdf.output(output_path)
     return output_path

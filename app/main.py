@@ -1,8 +1,12 @@
+import platform
+import subprocess
+import shutil
+import sys
+import os
+import asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
-import os
 from app.utils.cleanup_utils import cleanup_directory
 
 # Rota modüllerini içe aktar
@@ -16,6 +20,40 @@ from app.routes import (
     pdf_excel,
     csv_pdf
 )
+
+# LibreOffice otomatik kurulum fonksiyonu
+def try_install_libreoffice():
+    soffice_path = shutil.which("soffice")
+    if soffice_path:
+        print("LibreOffice zaten kurulu.")
+        return
+
+    system = platform.system()
+    try:
+        if system == "Linux":
+            # Debian/Ubuntu
+            if shutil.which("apt-get"):
+                print("LibreOffice kurulumu deneniyor (apt-get)...")
+                subprocess.run(["sudo", "apt-get", "update"], check=False)
+                subprocess.run(["sudo", "apt-get", "install", "-y", "libreoffice"], check=False)
+            # Fedora/CentOS
+            elif shutil.which("dnf"):
+                print("LibreOffice kurulumu deneniyor (dnf)...")
+                subprocess.run(["sudo", "dnf", "install", "-y", "libreoffice"], check=False)
+        elif system == "Windows":
+            import urllib.request
+            import tempfile
+            print("LibreOffice Windows için indiriliyor...")
+            url = "https://download.documentfoundation.org/libreoffice/stable/7.6.7/win/x86_64/LibreOffice_7.6.7_Win_x64.msi"
+            temp_dir = tempfile.gettempdir()
+            installer_path = os.path.join(temp_dir, "LibreOffice.msi")
+            urllib.request.urlretrieve(url, installer_path)
+            print("Kurulum başlatılıyor...")
+            subprocess.run(["msiexec", "/i", installer_path, "/qn"], check=False)
+        elif system == "Darwin":
+            print("macOS için otomatik kurulum desteklenmiyor. Lütfen manuel kurun: https://www.libreoffice.org/download/download/")
+    except Exception as e:
+        print(f"LibreOffice otomatik kurulamadı: {e}")
 
 # Arka plan temizlik görevi
 async def periodic_cleanup():
@@ -34,7 +72,8 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
-    # Arka plan görevini başlat
+    import threading
+    threading.Thread(target=try_install_libreoffice, daemon=True).start()
     asyncio.create_task(periodic_cleanup())
 
 # Genel hata yakalayıcı (Exception Handler)
