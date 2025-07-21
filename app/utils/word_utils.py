@@ -74,30 +74,39 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
         except Exception:
             pass
 
-    # 3. Sadece metin tabanlı PDF (her ortamda çalışır)
-    base_name = os.path.splitext(filename)[0]
-    output_path = os.path.join(OUTPUT_DIR, f"{base_name}_textonly.pdf")
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-    
-    doc = Document(tmp_path)
-    os.remove(tmp_path)
-    
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.add_font(FONT_NAME, "", FONT_PATH, uni=True)
-    pdf.set_font(FONT_NAME, size=12)
-    pdf.set_auto_page_break(auto=True, margin=15)
-    
-    # Uyarıyı PDF'e ekle
-    pdf.multi_cell(0, 10, "UYARI: Sunucuda ofis yazılımı bulunamadığı için sadece metin dönüştürüldü. Biçimlendirme ve görseller kaybolmuş olabilir.\n\n")
-    
-    # Metni PDF'e ekle (uzun kelimeleri bölerek)
-    for para in doc.paragraphs:
-        safe_text = split_long_words(para.text)
-        pdf.multi_cell(0, 10, safe_text)
+    # 3. Sadece metin tabanlı PDF (her ortamda çalışır ve bozuk dosya kontrolü yapar)
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
         
-    pdf.output(output_path)
-    return output_path
+        # Dosyanın geçerli bir docx olup olmadığını kontrol et
+        doc = Document(tmp_path)
+        
+        # Başarılı olursa PDF oluştur
+        base_name = os.path.splitext(filename)[0]
+        output_path = os.path.join(OUTPUT_DIR, f"{base_name}_textonly.pdf")
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.add_font(FONT_NAME, "", FONT_PATH, uni=True)
+        pdf.set_font(FONT_NAME, size=12)
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+        pdf.multi_cell(0, 10, "UYARI: Sunucuda ofis yazılımı bulunamadığı için sadece metin dönüştürüldü. Biçimlendirme ve görseller kaybolmuş olabilir.\n\n")
+        
+        for para in doc.paragraphs:
+            safe_text = split_long_words(para.text)
+            pdf.multi_cell(0, 10, safe_text)
+            
+        pdf.output(output_path)
+        return output_path
+
+    except Exception:
+        # Hata, dosyanın geçerli bir docx olmadığını gösterir
+        raise ValueError(f"'{filename}' dosyası geçerli bir Word (DOCX) belgesi olarak işlenemedi. Lütfen dosyanın bozuk olmadığını kontrol edin.")
+    finally:
+        # Geçici dosyayı her zaman sil
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
