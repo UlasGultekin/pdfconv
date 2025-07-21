@@ -13,6 +13,16 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 FONT_PATH = os.path.join(os.path.dirname(__file__), '..', 'fonts', 'DejaVuSans.ttf')
 FONT_NAME = "DejaVuSans"
 
+def split_long_words(text, max_len=50):
+    # Çok uzun kelimeleri böl
+    words = []
+    for word in text.split():
+        while len(word) > max_len:
+            words.append(word[:max_len])
+            word = word[max_len:]
+        words.append(word)
+    return ' '.join(words)
+
 def convert_word_to_pdf(content: bytes, filename: str) -> str:
     """
     DOCX dosyasını PDF'e dönüştürür.
@@ -84,9 +94,10 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
     # Uyarıyı PDF'e ekle
     pdf.multi_cell(0, 10, "UYARI: Sunucuda ofis yazılımı bulunamadığı için sadece metin dönüştürüldü. Biçimlendirme ve görseller kaybolmuş olabilir.\n\n")
     
-    # Metni PDF'e ekle
+    # Metni PDF'e ekle (uzun kelimeleri bölerek)
     for para in doc.paragraphs:
-        pdf.multi_cell(0, 10, para.text)
+        safe_text = split_long_words(para.text)
+        pdf.multi_cell(0, 10, safe_text)
         
     pdf.output(output_path)
     return output_path
