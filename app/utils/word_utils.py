@@ -3,6 +3,8 @@ import tempfile
 import shutil
 import platform
 import subprocess
+from docx import Document
+from fpdf import FPDF
 
 OUTPUT_DIR = "outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -10,61 +12,69 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def convert_word_to_pdf(content: bytes, filename: str) -> str:
     """
     DOCX dosyasını PDF'e dönüştürür.
-    Platformdan bağımsız olarak LibreOffice kullanmayı dener.
+    1. LibreOffice varsa onu kullanır (tam uyumlu)
+    2. Windows/macOS'ta docx2pdf (MS Word) varsa onu kullanır (tam uyumlu)
+    3. Hiçbiri yoksa, sadece metin tabanlı PDF üretir (biçimlendirme ve görseller kaybolur)
     """
-    # LibreOffice'in (soffice komutu) sistemde kurulu olup olmadığını kontrol et
+    # 1. LibreOffice kontrolü
     soffice_path = shutil.which("soffice")
-    if not soffice_path:
-        # Alternatif olarak docx2pdf'i dene (Windows/macOS için)
-        if platform.system() in ["Windows", "Darwin"]:
+    if soffice_path:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_docx_path = os.path.join(tmp_dir, filename)
+            with open(tmp_docx_path, "wb") as f:
+                f.write(content)
             try:
-                from docx2pdf import convert
-                print("LibreOffice bulunamadı, docx2pdf ile deneniyor...")
-                # docx2pdf geçici dosya ile çalışır
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    tmp_docx_path = os.path.join(tmp_dir, filename)
-                    with open(tmp_docx_path, "wb") as f:
-                        f.write(content)
-                    
-                    convert(tmp_docx_path, OUTPUT_DIR)
-                    base_name = os.path.splitext(filename)[0]
-                    return os.path.join(OUTPUT_DIR, f"{base_name}.pdf")
-            except ImportError:
-                raise EnvironmentError("Word'den PDF'e dönüştürme için sisteminizde LibreOffice veya docx2pdf kütüphanesi kurulu olmalıdır.")
-            except Exception as e:
-                 raise RuntimeError(f"docx2pdf ile dönüştürme sırasında hata oluştu: {e}")
-        
-        raise EnvironmentError("Word'den PDF'e dönüştürme için sisteminizde LibreOffice kurulu olmalıdır.")
+                subprocess.run(
+                    [soffice_path, "--headless", "--convert-to", "pdf", "--outdir", tmp_dir, tmp_docx_path],
+                    check=True,
+                    capture_output=True,
+                    timeout=60
+                )
+            except subprocess.CalledProcessError as e:
+                error_message = e.stderr.decode("utf-8", errors="ignore")
+                raise RuntimeError(f"LibreOffice ile dönüştürme sırasında bir hata oluştu: {error_message}")
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("LibreOffice ile dönüştürme işlemi zaman aşımına uğradı.")
+            base_name = os.path.splitext(filename)[0]
+            generated_pdf_path = os.path.join(tmp_dir, f"{base_name}.pdf")
+            if os.path.exists(generated_pdf_path):
+                final_output_path = os.path.join(OUTPUT_DIR, f"{base_name}.pdf")
+                shutil.move(generated_pdf_path, final_output_path)
+                return final_output_path
+            else:
+                raise FileNotFoundError("LibreOffice tarafından PDF dosyası oluşturulamadı.")
 
-    # LibreOffice ile dönüştürme
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_docx_path = os.path.join(tmp_dir, filename)
-        
-        # Gelen içeriği geçici bir .docx dosyasına yaz
-        with open(tmp_docx_path, "wb") as f:
-            f.write(content)
-        
-        # LibreOffice'i komut satırından çalıştır
+    # 2. docx2pdf (MS Word) kontrolü
+    if platform.system() in ["Windows", "Darwin"]:
         try:
-            subprocess.run(
-                [soffice_path, "--headless", "--convert-to", "pdf", "--outdir", tmp_dir, tmp_docx_path],
-                check=True,
-                capture_output=True,
-                timeout=60 # 60 saniye zaman aşımı
-            )
-        except subprocess.CalledProcessError as e:
-            error_message = e.stderr.decode("utf-8", errors="ignore")
-            raise RuntimeError(f"LibreOffice ile dönüştürme sırasında bir hata oluştu: {error_message}")
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("LibreOffice ile dönüştürme işlemi zaman aşımına uğradı.")
-        
-        # Oluşturulan PDF dosyasını bul ve taşı
-        base_name = os.path.splitext(filename)[0]
-        generated_pdf_path = os.path.join(tmp_dir, f"{base_name}.pdf")
-        
-        if os.path.exists(generated_pdf_path):
-            final_output_path = os.path.join(OUTPUT_DIR, f"{base_name}.pdf")
-            shutil.move(generated_pdf_path, final_output_path)
-            return final_output_path
-        else:
-            raise FileNotFoundError("LibreOffice tarafından PDF dosyası oluşturulamadı.")
+            from docx2pdf import convert
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_docx_path = os.path.join(tmp_dir, filename)
+                with open(tmp_docx_path, "wb") as f:
+                    f.write(content)
+                convert(tmp_docx_path, OUTPUT_DIR)
+                base_name = os.path.splitext(filename)[0]
+                return os.path.join(OUTPUT_DIR, f"{base_name}.pdf")
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+    # 3. Sadece metin tabanlı PDF (her ortamda çalışır)
+    # Kullanıcıya uyarı mesajı bırakmak için çıktı dosyasının adını özel yapıyoruz
+    base_name = os.path.splitext(filename)[0]
+    output_path = os.path.join(OUTPUT_DIR, f"{base_name}_textonly.pdf")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    doc = Document(tmp_path)
+    os.remove(tmp_path)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, "UYARI: Sunucuda ofis yazılımı bulunamadığı için sadece metin dönüştürüldü. Biçimlendirme ve görseller kaybolmuş olabilir.\n\n")
+    for para in doc.paragraphs:
+        pdf.multi_cell(0, 10, para.text)
+    pdf.output(output_path)
+    return output_path
