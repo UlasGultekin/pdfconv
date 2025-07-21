@@ -38,13 +38,19 @@ Bu proje, çeşitli dosya formatlarını (PDF, Word, Excel, CSV, Resim, Ses) bir
 
 Bu projenin bazı özellikleri, bilgisayarınızda ek yazılımların kurulu olmasını gerektirir:
 
+-   **LibreOffice:** Word dosyalarını PDF'e dönüştürmek (`/convert/word-to-pdf`) için **öncelikli ve tavsiye edilen** yöntemdir. Bu yöntem platformdan bağımsızdır (Windows, macOS, Linux).
+    -   **Kurulum:**
+        -   **Linux (Debian/Ubuntu):** `sudo apt-get install libreoffice`
+        -   **Linux (Fedora/CentOS):** `sudo dnf install libreoffice`
+        -   **Windows/macOS:** [Resmi LibreOffice sitesinden](https://www.libreoffice.org/download/download/) indirebilirsiniz.
+    -   Kurulumdan sonra `soffice` komutunun sistem PATH'inde olduğundan emin olun.
+
 -   **Tesseract OCR:** Resim dosyalarından metin çıkarmak (`/convert/image-to-text`) için gereklidir.
     -   [Tesseract Kurulum Kılavuzu](https://github.com/tesseract-ocr/tessdoc)
     -   Kurulum sırasında Türkçe veya desteklenmesini istediğiniz diğer dilleri de eklediğinizden emin olun.
     -   Kurulumdan sonra, Tesseract'in path'ini sisteminize tanıtmanız gerekebilir.
 
--   **Microsoft Word:** Word dosyalarını PDF'e dönüştürmek (`/convert/word-to-pdf`) için gereklidir.
-    -   Bu özellik `docx2pdf` kütüphanesini kullanır ve bu kütüphane arkaplanda Word uygulamasını çalıştırır. Bu nedenle, sunucunun çalıştığı makinede MS Word'ün kurulu ve lisanslı olması gerekir.
+-   **Microsoft Word (Alternatif):** Eğer sisteminizde LibreOffice kurulu değilse ve **sadece Windows veya macOS** kullanıyorsanız, `docx2pdf` kütüphanesi aracılığıyla MS Word kullanılarak dönüştürme denenecektir. Bu, sunucu ortamları için **tavsiye edilmez**.
 
 ## Kullanım
 
