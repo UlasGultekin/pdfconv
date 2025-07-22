@@ -1,22 +1,20 @@
 FROM python:3.11-slim
 
-# Sistem bağımlılıklarını yükle
+# Sistem bağımlılıklarını ve fontları yükle
 RUN apt-get update && \
-    apt-get install -y libreoffice && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y libreoffice fonts-dejavu fonts-noto && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Çalışma dizini
 WORKDIR /app
 
-# Gereksinimleri kopyala ve yükle
+# Python bağımlılıklarını yükle
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Uygulama dosyalarını kopyala
 COPY . .
 
-# Port ayarla
+# Port ayarla (ör. FastAPI için)
 EXPOSE 8000
 
 # Uygulama başlatma komutu
