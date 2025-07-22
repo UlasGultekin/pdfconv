@@ -41,32 +41,39 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
         base_name = os.path.splitext(filename)[0]
         output_path = os.path.join(OUTPUT_DIR, f"{base_name}_textonly.pdf")
         pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=10)
         pdf.add_page()
         try:
             pdf.add_font(FONT_NAME, "", FONT_PATH, uni=True)
         except Exception:
             pass  # Font zaten ekli olabilir
         pdf.set_font(FONT_NAME, size=12)
-        pdf.set_auto_page_break(auto=True, margin=15)
+        page_width = pdf.w - pdf.l_margin - pdf.r_margin
         # Başlangıç uyarısı
         pdf.multi_cell(0, 10, "UYARI: Sunucuda ofis yazılımı bulunamadığı için sadece metin dönüştürüldü. Biçimlendirme ve görseller kaybolmuş olabilir.\nUzun metinlerde satır ve paragraf bölünmesi otomatik yapılmıştır.\n\n")
         for para in doc.paragraphs:
             if not para.text.strip():
                 continue
-            lines = split_long_words_and_lines(para.text)
-            for line in lines:
-                if not line.strip():
-                    continue
-                try:
-                    pdf.multi_cell(0, 10, line)
-                except Exception:
-                    # Hata olursa satırı daha küçük parçalara bölerek ekle
-                    for subline in [line[i:i+200] for i in range(0, len(line), 200)]:
+            words = para.text.split()
+            for word in words:
+                # Çok uzun kelimeleri tek karakterlik parçalara böl
+                if len(word) > 100:
+                    for i in range(0, len(word), 1):
                         try:
-                            pdf.multi_cell(0, 10, subline)
+                            pdf.multi_cell(page_width, 10, word[i])
                         except Exception:
-                            # En küçük parça bile eklenemiyorsa atla
                             continue
+                else:
+                    try:
+                        pdf.multi_cell(page_width, 10, word)
+                    except Exception:
+                        # Son çare: karakter karakter ekle
+                        for ch in word:
+                            try:
+                                pdf.multi_cell(page_width, 10, ch)
+                            except Exception:
+                                continue
+            pdf.ln(5)
         # Son uyarı
         pdf.multi_cell(0, 10, "\n---\nNot: Bu PDF yalnızca metin içeriğiyle oluşturulmuştur. Orijinal Word dosyasındaki biçimlendirme, tablo ve görseller yer almaz.")
         pdf.output(output_path)
