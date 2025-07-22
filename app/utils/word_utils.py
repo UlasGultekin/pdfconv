@@ -37,6 +37,21 @@ def split_text_to_lines(text, max_line_length=100):
         lines.append(text)
     return lines
 
+def safe_multi_cell(pdf, width, height, text):
+    """
+    FPDF multi_cell fonksiyonunu güvenli şekilde kullanır.
+    Satır sığmazsa otomatik olarak daha küçük parçalara böler.
+    """
+    try:
+        pdf.multi_cell(width, height, text)
+    except Exception:
+        # Satırda boşluk yoksa veya çok uzunsa, daha küçük parçalara böl
+        if len(text) <= 1:
+            return  # Tek karakter bile sığmıyorsa atla
+        mid = len(text) // 2
+        safe_multi_cell(pdf, width, height, text[:mid])
+        safe_multi_cell(pdf, width, height, text[mid:])
+
 def convert_word_to_pdf(content: bytes, filename: str) -> str:
     """
     DOCX dosyasını PDF'e dönüştürür (yalnızca metin, biçim ve görsel olmadan).
@@ -69,10 +84,7 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
                 continue
             lines = split_text_to_lines(para.text, max_line_length=100)
             for line in lines:
-                try:
-                    pdf.multi_cell(page_width, 10, line)
-                except Exception:
-                    continue
+                safe_multi_cell(pdf, page_width, 10, line)
             pdf.ln(3)
         # Son uyarı
         pdf.multi_cell(0, 10, "\n---\nNot: Bu PDF yalnızca metin içeriğiyle oluşturulmuştur. Orijinal Word dosyasındaki biçimlendirme, tablo ve görseller yer almaz.")
