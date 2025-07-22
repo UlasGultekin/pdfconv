@@ -24,6 +24,19 @@ def split_long_words_and_lines(text, max_word_len=50, max_line_len=1000):
     lines = [joined[i:i+max_line_len] for i in range(0, len(joined), max_line_len)]
     return lines
 
+def split_text_to_lines(text, max_line_length=100):
+    # Metni max_line_length karakterlik satırlara böl
+    lines = []
+    while len(text) > max_line_length:
+        split_at = text.rfind(' ', 0, max_line_length)
+        if split_at == -1:
+            split_at = max_line_length
+        lines.append(text[:split_at])
+        text = text[split_at:].lstrip()
+    if text:
+        lines.append(text)
+    return lines
+
 def convert_word_to_pdf(content: bytes, filename: str) -> str:
     """
     DOCX dosyasını PDF'e dönüştürür (yalnızca metin, biçim ve görsel olmadan).
@@ -54,26 +67,13 @@ def convert_word_to_pdf(content: bytes, filename: str) -> str:
         for para in doc.paragraphs:
             if not para.text.strip():
                 continue
-            words = para.text.split()
-            for word in words:
-                # Çok uzun kelimeleri tek karakterlik parçalara böl
-                if len(word) > 100:
-                    for i in range(0, len(word), 1):
-                        try:
-                            pdf.multi_cell(page_width, 10, word[i])
-                        except Exception:
-                            continue
-                else:
-                    try:
-                        pdf.multi_cell(page_width, 10, word)
-                    except Exception:
-                        # Son çare: karakter karakter ekle
-                        for ch in word:
-                            try:
-                                pdf.multi_cell(page_width, 10, ch)
-                            except Exception:
-                                continue
-            pdf.ln(5)
+            lines = split_text_to_lines(para.text, max_line_length=100)
+            for line in lines:
+                try:
+                    pdf.multi_cell(page_width, 10, line)
+                except Exception:
+                    continue
+            pdf.ln(3)
         # Son uyarı
         pdf.multi_cell(0, 10, "\n---\nNot: Bu PDF yalnızca metin içeriğiyle oluşturulmuştur. Orijinal Word dosyasındaki biçimlendirme, tablo ve görseller yer almaz.")
         pdf.output(output_path)
